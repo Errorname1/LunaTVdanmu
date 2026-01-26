@@ -1190,6 +1190,7 @@ export const UserMenu: React.FC = () => {
 
           {/* 版本信息 */}
           <button
+            disabled
             onClick={() => {
               setIsVersionPanelOpen(true);
               handleCloseMenu();
