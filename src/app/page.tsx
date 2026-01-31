@@ -639,9 +639,9 @@ function HomeClient() {
       <TelegramWelcomeModal />
 
       {/* 主要修改：删除欢迎横幅，添加 mt-6 上移内容 */}
-      <div className='overflow-visible mt-6 pb-32 md:pb-safe-bottom'>
+      <div className='overflow-visible mt-12 pb-32 md:pb-safe-bottom'>
         {/* 顶部 Tab 切换 */}
-        <div className='mb-8 -mt-6 flex items-center justify-center'>
+        <div className='mb-8 -mt-12 flex items-center justify-center'>
           <CapsuleSwitch
             options={[
               { label: '首页', value: 'home' },
