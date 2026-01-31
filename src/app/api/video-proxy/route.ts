@@ -68,7 +68,7 @@ export async function GET(request: Request) {
 
   // 创建 AbortController 用于超时控制
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
+  const timeoutId = setTimeout(() => controller.abort(), 180000); // 180秒超时
 
   try {
     // 动态设置 Referer 和 Origin（根据视频源域名）
@@ -263,7 +263,7 @@ export async function GET(request: Request) {
     // 错误类型判断
     if (error.name === 'AbortError') {
       return NextResponse.json(
-        { error: 'Video fetch timeout (30s)' },
+        { error: 'Video fetch timeout (180s)' },
         { status: 504 }
       );
     }
