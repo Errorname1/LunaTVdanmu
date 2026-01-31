@@ -239,7 +239,7 @@ function HeroBanner({
 
   return (
     <div
-      className="relative w-full h-[50vh] sm:h-[55vh] md:h-[60vh] overflow-hidden group"
+      className="relative w-full h-[70vh] sm:h-[75vh] md:h-[80vh] lg:h-[85vh] xl:h-[90vh] overflow-hidden group"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       {...swipeHandlers}
@@ -408,7 +408,7 @@ function HeroBanner({
                       currentItem.type === 'variety' ? 'show' : (currentItem.type || 'movie')
                     }`
               }
-              className="flex items-center gap-2 px-6 sm:px-8 md:px-10 py-2.5 sm:py-3 md:py-4 bg-white/30 backdrop-blur-md text-white font-bold rounded hover:bg-white/40 transition-all transform hover:scale-105 active:scale-95 shadow-xl text-base sm:text-lg md:text-xl border border-white/50"
+              className="flex items-center gap-2 px-6 sm:px-8 md:px-10 py-2.5 sm:py-3 md:py-4 bg-white/30 backdrop-blur-md text-white font-bold rounded hover:bg-white/40 transition-all transform hover:scale-105 active:scale-95 shadow-xl text-base sm:text-lg md:text-xl border border-white/50 hidden"
             >
               <Info className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7" />
               <span>更多信息</span>
