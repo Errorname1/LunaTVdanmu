@@ -351,6 +351,7 @@ function PlayPageClient() {
     danmuList, // 弹幕列表state（用于显示弹幕数量）
     loading: danmuLoading, // 加载状态（state）
     loadMeta: danmuLoadMeta, // 加载元数据
+    error: danmuError, // 错误状态
     loadExternalDanmu,
     handleDanmuOperationOptimized,
     externalDanmuEnabledRef,
@@ -4092,6 +4093,8 @@ function PlayPageClient() {
           // 其他浏览器：不显示 Chromecast（不支持 Cast API）
           ...(isChrome && !isIOS ? [
             artplayerPluginChromecast({
+              title: videoTitle ? `${videoTitle}${currentEpisodeIndex >= 0 ? ` - 第${currentEpisodeIndex + 1}集` : ''}` : undefined,
+              poster: videoCover || undefined,
               onStateChange: (state) => {
                 console.log('Chromecast state changed:', state);
               },
@@ -4100,6 +4103,9 @@ function PlayPageClient() {
               },
               onCastStart: () => {
                 console.log('Chromecast started');
+              },
+              onCastEnd: () => {
+                console.log('Chromecast ended');
               },
               onError: (error) => {
                 console.error('Chromecast error:', error);
@@ -5388,6 +5394,7 @@ function PlayPageClient() {
         danmuCount={danmuList.length} // 使用state而不是ref，确保React能追踪变化
         loading={danmuLoading}
         loadMeta={danmuLoadMeta}
+        error={danmuError}
         onReload={async () => {
           // 重新加载外部弹幕（强制刷新）
           const result = await loadExternalDanmu({ force: true });
