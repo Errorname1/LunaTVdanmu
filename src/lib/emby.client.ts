@@ -79,6 +79,13 @@ export class EmbyClient {
   constructor(config: EmbyConfig) {
     let serverUrl = config.ServerURL.replace(/\/$/, '');
 
+    // 🔍 调试日志
+    console.log('🎬 EmbyClient 初始化配置:', {
+      transcodeMp4: config.transcodeMp4,
+      proxyPlay: config.proxyPlay,
+      key: config.key,
+    });
+
     // 存储高级选项
     this.removeEmbyPrefix = config.removeEmbyPrefix || false;
     this.appendMediaSourceId = config.appendMediaSourceId || false;
@@ -515,15 +522,18 @@ export class EmbyClient {
     let url: string;
 
     if (direct) {
-      // 选项3: 转码mp4
+      // 选项3: 转码mp4 - 使用 HLS 强制音频转码
       if (this.transcodeMp4) {
-        url = `${this.serverUrl}/Videos/${itemId}/stream.mp4?api_key=${token}`;
+        // 生成唯一的 PlaySessionId
+        const playSessionId = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+        // 使用 HLS 端点并强制音频转码为 AAC，避免 EAC3/TrueHD 兼容性问题
+        url = `${this.serverUrl}/Videos/${itemId}/master.m3u8?api_key=${token}&AudioCodec=aac&AudioBitrate=320000&MaxAudioChannels=6&PlaySessionId=${playSessionId}`;
       } else {
         url = `${this.serverUrl}/Videos/${itemId}/stream?Static=true&api_key=${token}`;
       }
 
       // 选项2: 拼接MediaSourceId参数
-      if (this.appendMediaSourceId) {
+      if (this.appendMediaSourceId && !this.transcodeMp4) {
         try {
           const playbackInfo = await this.getPlaybackInfo(itemId);
           if (playbackInfo.MediaSourceId) {
