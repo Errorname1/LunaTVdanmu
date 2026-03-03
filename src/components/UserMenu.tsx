@@ -752,6 +752,7 @@ export const UserMenu: React.FC = () => {
 
           {/* 版本信息 */}
           <button
+            disabled   //添加此代码
             onClick={() => {
               setIsVersionPanelOpen(true);
               handleCloseMenu();
