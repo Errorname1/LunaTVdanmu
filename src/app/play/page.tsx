@@ -1927,6 +1927,14 @@ function PlayPageClient() {
         return;
       }
 
+      // ✅ 关键修复：如果正在换集，不要调用setVideoUrl，避免触发initPlayer
+      // 换集逻辑会自己处理URL更新
+      if (isEpisodeChangingRef.current) {
+        console.log('🎵 检测到换集中，仅更新音轨选择，不触发URL变更');
+        setCurrentAudioTrack(preferredTrack.index);
+        return;
+      }
+
       const targetUrl = appendAudioStreamIndex(activeUrl, preferredTrack.index);
       setCurrentAudioTrack(preferredTrack.index);
       if (targetUrl && targetUrl !== activeUrl) {
@@ -2003,7 +2011,7 @@ function PlayPageClient() {
     }
 
     processAudioTracks(rawTracks);
-  }, [currentEpisodeIndex, detail, resetAudioTrackState, videoUrl]);
+  }, [currentEpisodeIndex, detail, resetAudioTrackState]);
 
   // 处理音轨切换
   const handleAudioTrackSelect = async (track: typeof audioTracks[0]) => {
@@ -4035,26 +4043,7 @@ function PlayPageClient() {
     // 🔥 在初始化新播放器之前，先清理旧的播放器实例
     if (artPlayerRef.current) {
       console.log('[Play] 检测到旧播放器实例，先清理');
-
-      // 🔥 关键修复：如果处于网页全屏状态，先退出网页全屏
-      // 原因：ArtPlayer设置了FULLSCREEN_WEB_IN_BODY=true时，网页全屏会把播放器移到body下
-      // 如果不先退出全屏就destroy，播放器容器位置会错乱，导致新播放器只有声音没有画面
-      // 参考ArtPlayer源码：packages/artplayer/src/player/fullscreenWebMix.js
-      const wasFullscreenWeb = artPlayerRef.current.fullscreenWeb;
-
-      if (wasFullscreenWeb) {
-        console.log('[Play] 检测到网页全屏状态，先退出网页全屏（稍后恢复）');
-        artPlayerRef.current.fullscreenWeb = false;
-        // 等待DOM恢复到原容器位置（fullscreenWeb setter会调用append($container, $player)）
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-
       await cleanupPlayer();
-
-      // 🔥 标记需要恢复网页全屏状态
-      if (wasFullscreenWeb) {
-        (window as any).__shouldRestoreFullscreenWeb = true;
-      }
     }
 
     // 确保选集索引有效
@@ -4181,39 +4170,24 @@ function PlayPageClient() {
 
         switchPromiseRef.current = switchPromise;
         await switchPromise;
-
+        
         if (artPlayerRef.current?.video) {
           ensureVideoSource(
             artPlayerRef.current.video as HTMLVideoElement,
             videoUrl
           );
         }
-
+        
         // 🚀 移除原有的 setTimeout 弹幕加载逻辑，交由 useEffect 统一优化处理
-
-        console.log('✅ 使用switch方法成功切换视频（保持全屏状态）');
+        
+        console.log('使用switch方法成功切换视频');
         return;
       } catch (error) {
-        console.warn('⚠️ Switch方法失败，将重建播放器:', error);
+        console.warn('Switch方法失败，将重建播放器:', error);
         // 重置集数切换标识
         isEpisodeChangingRef.current = false;
-
-        // 🔥 记录网页全屏状态，重建后恢复
-        const wasFullscreenWeb = artPlayerRef.current?.fullscreenWeb || false;
-
         // 如果switch失败，清理播放器并重新创建
-        if (wasFullscreenWeb && artPlayerRef.current) {
-          console.log('[Play] Switch失败，退出网页全屏后重建（稍后恢复）');
-          artPlayerRef.current.fullscreenWeb = false;
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-
         await cleanupPlayer();
-
-        // 标记需要恢复网页全屏
-        if (wasFullscreenWeb) {
-          (window as any).__shouldRestoreFullscreenWeb = true;
-        }
       }
     }
     if (artPlayerRef.current) {
@@ -4830,18 +4804,6 @@ function PlayPageClient() {
       artPlayerRef.current.on('ready', async () => {
         setError(null);
         setPlayerReady(true); // 标记播放器已就绪，启用观影室同步
-
-        // 🔥 恢复网页全屏状态（如果之前是全屏的）
-        if ((window as any).__shouldRestoreFullscreenWeb) {
-          console.log('[Play] 恢复网页全屏状态');
-          // 延迟一下确保播放器完全初始化
-          setTimeout(() => {
-            if (artPlayerRef.current) {
-              artPlayerRef.current.fullscreenWeb = true;
-            }
-            (window as any).__shouldRestoreFullscreenWeb = false;
-          }, 200);
-        }
 
         // 使用ArtPlayer layers API添加分辨率徽章（带渐变和发光效果）
         const video = artPlayerRef.current.video as HTMLVideoElement;
