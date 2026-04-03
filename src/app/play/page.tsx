@@ -1915,7 +1915,8 @@ function PlayPageClient() {
 
       console.log('🎵 当前选中音轨:', selectedTrackIndex);
 
-      // 应用用户偏好
+      // 应用用户偏好 - 仅更新状态，不触发URL变更
+      // URL变更由换集逻辑或用户手动切换音轨时处理
       const preferredLang = loadPreferredAudioLang();
       if (!preferredLang) return;
 
@@ -1923,23 +1924,12 @@ function PlayPageClient() {
         t => normalizeAudioLang(t.language) === preferredLang
       );
 
-      if (!preferredTrack || preferredTrack.index === selectedTrackIndex) {
-        return;
-      }
-
-      // ✅ 关键修复：如果正在换集，不要调用setVideoUrl，避免触发initPlayer
-      // 换集逻辑会自己处理URL更新
-      if (isEpisodeChangingRef.current) {
-        console.log('🎵 检测到换集中，仅更新音轨选择，不触发URL变更');
+      if (preferredTrack && preferredTrack.index !== selectedTrackIndex) {
+        console.log('🎵 找到偏好音轨，更新选择状态:', preferredTrack.name);
         setCurrentAudioTrack(preferredTrack.index);
-        return;
-      }
-
-      const targetUrl = appendAudioStreamIndex(activeUrl, preferredTrack.index);
-      setCurrentAudioTrack(preferredTrack.index);
-      if (targetUrl && targetUrl !== activeUrl) {
-        console.log('🎵 应用偏好音轨，切换URL:', targetUrl);
-        setVideoUrl(targetUrl);
+        // 注意：不调用setVideoUrl()，避免触发initPlayer
+        // 换集时，updateVideoUrl会处理音轨参数
+        // 用户手动切换音轨时，handleAudioTrackSelect会处理
       }
     };
 
@@ -2154,7 +2144,14 @@ function PlayPageClient() {
       }
     } else {
       // 普通视频格式
-      const newUrl = episodeData || '';
+      let newUrl = episodeData || '';
+
+      // ✅ 关键修复：对于Emby源，如果有偏好音轨，添加AudioStreamIndex参数
+      const isEmbySource = detailData.source === 'emby' || detailData.source?.startsWith('emby_');
+      if (isEmbySource && newUrl && currentAudioTrackRef.current >= 0) {
+        newUrl = appendAudioStreamIndex(newUrl, currentAudioTrackRef.current);
+        console.log('🎵 换集时应用音轨参数:', currentAudioTrackRef.current);
+      }
 
       if (newUrl !== videoUrl) {
         setVideoUrl(newUrl);
@@ -2282,45 +2279,63 @@ function PlayPageClient() {
       clearTimeout(episodeSwitchTimeoutRef.current);
       episodeSwitchTimeoutRef.current = null;
     }
-    
+
     // 清理弹幕状态引用
     danmuPluginStateRef.current = null;
-    
+
     if (artPlayerRef.current) {
       try {
-        // 1. 清理弹幕插件的WebWorker
+        // 🔥 关键：先保存 video 和 hls 引用
+        const video = artPlayerRef.current.video;
+        const hls = video?.hls;
+
+        // 清理弹幕插件
         if (artPlayerRef.current.plugins?.artplayerPluginDanmuku) {
           const danmukuPlugin = artPlayerRef.current.plugins.artplayerPluginDanmuku;
-          
-          // 尝试获取并清理WebWorker
           if (danmukuPlugin.worker && typeof danmukuPlugin.worker.terminate === 'function') {
             danmukuPlugin.worker.terminate();
-            console.log('弹幕WebWorker已清理');
+            console.log('[Cleanup] 弹幕WebWorker已清理');
           }
-          
-          // 清空弹幕数据
           if (typeof danmukuPlugin.reset === 'function') {
             danmukuPlugin.reset();
           }
         }
 
-        // 2. 销毁HLS实例
-        if (artPlayerRef.current.video.hls) {
-          artPlayerRef.current.video.hls.destroy();
-          console.log('HLS实例已销毁');
-        }
-
-        // 3. 销毁ArtPlayer实例 (使用false参数避免DOM清理冲突)
+        // 1. 先销毁 ArtPlayer，停止所有控制
         artPlayerRef.current.destroy(false);
         artPlayerRef.current = null;
-        setPlayerReady(false); // 重置播放器就绪状态
+        setPlayerReady(false);
+        console.log('[Cleanup] ArtPlayer已销毁');
+
+        // 2. 然后清理 video 和 HLS
+        if (video) {
+          video.pause();
+          console.log('[Cleanup] 视频已暂停');
+        }
+
+        if (hls) {
+          try {
+            hls.stopLoad();
+            hls.detachMedia();
+            hls.destroy();
+            console.log('[Cleanup] HLS已清理');
+          } catch (err) {
+            console.warn('[Cleanup] HLS清理出错:', err);
+          }
+        }
+
+        if (video) {
+          video.removeAttribute('src');
+          video.load();
+          video.src = '';
+          console.log('[Cleanup] video src已清空');
+        }
 
         console.log('播放器资源已清理');
       } catch (err) {
         console.warn('清理播放器资源时出错:', err);
-        // 即使出错也要确保引用被清空
         artPlayerRef.current = null;
-        setPlayerReady(false); // 重置播放器就绪状态
+        setPlayerReady(false);
       }
     }
   };
@@ -4039,12 +4054,6 @@ function PlayPageClient() {
       ) {
         return;
       }
-
-    // 🔥 在初始化新播放器之前，先清理旧的播放器实例
-    if (artPlayerRef.current) {
-      console.log('[Play] 检测到旧播放器实例，先清理');
-      await cleanupPlayer();
-    }
 
     // 确保选集索引有效
     if (
